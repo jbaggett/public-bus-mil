@@ -1,7 +1,7 @@
 [project]
 name = "public-bus-mil"
-version = "1.0.0"
-description = "Reproducible exam-level MIL test set from public BUS video datasets (MICCAI-BUV + WHBUS)"
+version = "0.2.0"
+description = "Reproducible exam-level MIL benchmark from public BUS video datasets (MICCAI-BUV + WHBUS) with 5-fold patient-grouped splits"
 readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "MIT"}
@@ -9,6 +9,7 @@ dependencies = [
     "numpy>=1.23",
     "pillow>=9.0",
     "scipy>=1.10",
+    "scikit-learn>=1.1",
 ]
 
 [project.optional-dependencies]

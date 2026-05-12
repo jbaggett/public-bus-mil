@@ -22,6 +22,8 @@ BAG_COLUMNS = [
     "n_frames",      # number of frames in this bag
     "patient_id",    # inferred where available; "unknown" otherwise
     "has_bboxes",    # True if any frame in this bag has a bbox annotation
+    "fold",          # 1..5, patient-grouped + (dataset,label)-stratified;
+                     # fold 5 is the default held-out test set (see splits.py)
 ]
 
 FRAME_COLUMNS = [
@@ -40,10 +42,36 @@ def write_manifest(
     bag_rows: List[Dict[str, Any]],
     frame_rows: List[Dict[str, Any]],
     out_dir: Path,
+    assign_splits: bool = True,
 ) -> None:
-    """Write manifest.csv and frames.csv to `out_dir`."""
+    """Write manifest.csv and frames.csv to `out_dir`.
+
+    If ``assign_splits`` is True (default) and scikit-learn is available,
+    populate the ``fold`` column with the standard 5-fold patient-grouped
+    + (dataset,label)-stratified split (see ``public_bus_mil.splits``).
+    Bags whose fold cannot be computed (e.g., sklearn missing) get an
+    empty string in the column.
+    """
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Assign 5-fold patient-grouped splits in place.
+    if assign_splits and bag_rows:
+        try:
+            from .splits import assign_folds, summarize_folds
+            folds = assign_folds(bag_rows)
+            for row, f in zip(bag_rows, folds):
+                row["fold"] = f
+            # Also drop a human-readable composition summary alongside.
+            (out_dir / "splits_summary.txt").write_text(
+                "Standard 5-fold patient-grouped + (dataset,label)-stratified splits.\n"
+                "Default test set = fold 5.\n"
+                "Splits are deterministic given seed=42; see public_bus_mil.splits.\n\n"
+                + summarize_folds(bag_rows, folds) + "\n"
+            )
+        except ImportError:
+            for row in bag_rows:
+                row.setdefault("fold", "")
 
     with open(out_dir / "manifest.csv", "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=BAG_COLUMNS)

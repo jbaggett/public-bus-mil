@@ -85,12 +85,12 @@ python build_bags.py \
 
 `manifest.csv` (bag-level):
 
-| bag_id | dataset | source_id | label | n_frames | patient_id | has_bboxes |
-|---|---|---|---|---|---|---|
-| buv_0001 | buv | 263b86b85a58f270 | 0 | 8 | buv_p001 | True |
-| buv_0002 | buv | xf7f83b2a576016b | 1 | 8 | buv_p002 | True |
-| whbus_0001 | whbus | benign_9161001_10 | 0 | 8 | whbus_9161001 | False |
-| ... | | | | | | |
+| bag_id | dataset | source_id | label | n_frames | patient_id | has_bboxes | fold |
+|---|---|---|---|---|---|---|---|
+| buv_0001 | buv | 263b86b85a58f270 | 0 | 8 | buv_p001 | True | 3 |
+| buv_0002 | buv | xf7f83b2a576016b | 1 | 8 | buv_p002 | True | 5 |
+| whbus_0001 | whbus | benign_9161001_10 | 0 | 8 | whbus_9161001 | False | 2 |
+| ... | | | | | | | |
 
 `frames.csv` (frame-level):
 
@@ -103,6 +103,54 @@ python build_bags.py \
 
 See `examples/load_torch_dataset.py` for a 30-line PyTorch dataset that
 reads the manifest and yields `(bag_tensor, label)` pairs.
+
+---
+
+## Standard splits — 5-fold, patient-grouped, stratified
+
+`manifest.csv` includes a `fold` column with values 1–5. Splits are:
+
+- **Grouped at the patient level** — no patient appears in two folds.
+  WHBUS patient IDs are extracted from the source clip-folder naming
+  convention (`{label}_{patient_id}_{clip_index}`); BUV is one patient
+  per clip per its errata, with the 4 known errata-grouped clips merged
+  into a single bag (see `DATASET_SPEC.md` §2).
+- **Stratified by `(dataset, label)`** — each fold has comparable
+  BUV/WHBUS × benign/malignant composition.
+- **Deterministic** — fixed `random_state=42`; running `build_bags.py`
+  twice on the same source data produces identical fold assignments.
+
+### Default convention
+
+**Fold 5 is the standard held-out test set.** Groups training MIL models
+on this benchmark should:
+
+1. Train on folds 1–4 (with their own internal train/val split — e.g.,
+   fold 4 as validation).
+2. Evaluate once on fold 5 and report those numbers.
+3. Optionally, also report 5-fold cross-validation numbers using each
+   fold in turn as the test set.
+
+Per-fold composition is written to `splits_summary.txt` alongside the
+manifest. Typical balance:
+
+```
+Fold | n_bags | BUV | WHBUS | benign | malignant | n_patients
+-----|--------|-----|-------|--------|-----------|-----------
+ 1   |   71   |  35 |   36  |   36   |    35     |    62
+ 2   |   75   |  38 |   37  |   39   |    36     |    63
+ 3   |   72   |  36 |   36  |   38   |    34     |    61
+ 4   |   72   |  35 |   37  |   37   |    35     |    62
+ 5   |   74   |  36 |   38  |   37   |    37     |    63   (default test)
+```
+
+(The numbers above are illustrative; exact per-fold counts depend on
+the source-data version + your build invocation.)
+
+If you want a different split scheme (e.g., dataset-out, or
+patient-stratified with different K), call
+`public_bus_mil.splits.assign_folds()` directly — it's a standalone
+helper.
 
 ---
 
