@@ -157,6 +157,80 @@ helper.
 
 ---
 
+## Using this benchmark to compare fine-tuning approaches
+
+A common use case for a small standardized MIL test cohort is **head-to-
+head comparison of fine-tuning recipes** on a fixed set of patient-
+grouped folds. The benchmark is designed to make these comparisons
+direct and reproducible across research groups.
+
+### Recommended protocol
+
+For a single point estimate (faster, simpler):
+
+1. Train on the union of folds 1–4 (with your own internal train/val
+   split — e.g., fold 4 as validation during training).
+2. Evaluate **once** on fold 5.
+3. Report `AUROC` and `AUPRC` on fold 5, with 1,000-iteration bootstrap
+   95% CIs over the fold-5 bag list.
+4. Repeat with 3 random seeds (default 42, 123, 789) and report the
+   ensemble (mean of per-seed probabilities) plus the per-seed
+   mean ± SD as a measure of training-stability dispersion.
+
+For a more rigorous estimate (preferred when comparing approaches):
+
+1. 5-fold cross-validation — for each of folds 1–5 in turn, train on
+   the other four and evaluate on the held-out fold.
+2. Report the **mean across folds** with the **fold-level SD** as an
+   uncertainty band that accounts for both bag-sampling and
+   fold-composition variance.
+3. (Still useful to also report the single fold-5 number for
+   single-split comparability with publications that use the default
+   protocol.)
+
+### Things you can compare cleanly under this protocol
+
+- **Backbone choice**: ImageNet-pretrained CNNs/ViTs (ResNet, ConvNeXt,
+  ViT-B/16) vs medical/biomedical pretraining (URFM, USFM, BiomedCLIP,
+  UltraSAM) vs self-supervised checkpoints (DINOv2, MAE).
+- **Fine-tuning regime**: full fine-tune vs LoRA (varying rank) vs
+  linear probe vs adapter modules vs BitFit. Hold the backbone and
+  aggregator fixed; sweep only the trainable-parameter scope.
+- **MIL aggregator**: ABMIL, DSMIL, TransMIL, CLAM, simple mean/max
+  pooling. Hold the backbone and fine-tuning regime fixed.
+- **Auxiliary losses**: bag BCE alone vs bag BCE + soft top-k (k=3/5/10)
+  vs other instance-level regularizers.
+- **Augmentation policies**: minimal (just flips) vs heavier color
+  jitter + affine vs frame-resampling strategies.
+
+### What this benchmark is NOT useful for
+
+- **Training large models from scratch.** 366 bags (~2,776 frames) is
+  far too small. Use this only for fine-tuning a pretrained backbone.
+- **Pretraining or large-scale self-supervised learning.** Same reason.
+- **Absolute SOTA claims on breast-US classification.** The benchmark
+  is a **shared comparator**, not a representative clinical-deployment
+  cohort. Don't use it to make population-level claims; use it to make
+  same-fold method-vs-method claims.
+- **Saliency evaluation in physical units (mm)** with high precision.
+  The source frames lack DICOM pixel calibration; mm thresholds are
+  only approximate.
+
+### Suggested reporting template (for a method-comparison paper)
+
+| Approach | Fold 5 AUROC (95% CI) | 5-fold mean AUROC (± SD) | Trainable params |
+|---|---|---|---|
+| Baseline (ResNet50 + ABMIL, full FT) | 0.83 (0.78–0.88) | 0.81 ± 0.03 | 25.6 M |
+| ResNet50 + ABMIL + LoRA rank=8 | 0.84 (0.79–0.89) | 0.82 ± 0.02 | 0.4 M |
+| URFM + DSMIL + LoRA rank=8 | 0.87 (0.82–0.91) | 0.85 ± 0.03 | 0.8 M |
+| ... | | | |
+
+(Numbers above are illustrative; the actual baselines a method-
+comparison paper would establish on this benchmark are not yet
+published. Contributions of additional baselines via PR are welcome.)
+
+---
+
 ## Known limitations
 
 - **Bag unit is the clip/video, not the patient.** Both source datasets
