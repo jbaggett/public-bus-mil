@@ -9,10 +9,13 @@ video datasets:
 - **WHBUS** (Zhang et al., ISBI 2024) — 184 clips from 131 patients,
   clip-level malignancy labels.
 
-The benchmark constructs uniform exam-level bags of frames using a
-deterministic keyframe algorithm (Laplacian-variance + minimum-interval
-temporal spacing), trims dark scanner margins, and emits a manifest
-compatible with most attention-based MIL pipelines.
+The benchmark constructs uniform exam-level bags of frames using the
+deterministic keyframe-selection algorithm published with the MICCAI-BUV
+dataset (Lin et al., MICCAI 2022 — Laplacian-variance score, minimum-
+interval temporal spacing, relative sharpness threshold, top-K by score;
+see `DATASET_SPEC.md` §4 and the CVA-Net source repository), trims dark
+scanner margins, and emits a manifest compatible with most
+attention-based MIL pipelines.
 
 Designed for use as an **external validation cohort** for breast-ultrasound
 classification and saliency models trained on private clinical datasets.
@@ -151,6 +154,39 @@ If you want a different split scheme (e.g., dataset-out, or
 patient-stratified with different K), call
 `public_bus_mil.splits.assign_folds()` directly — it's a standalone
 helper.
+
+---
+
+## Known limitations
+
+- **Bag unit is the clip/video, not the patient.** Both source datasets
+  publish at clip/video granularity and report metrics that way. WHBUS
+  in particular has multi-clip patients (mean ≈ 1.4 clips/patient
+  across 131 patients), so a patient with 3 clips contributes 3 bags.
+  The 5-fold split groups all of one patient's bags into a single fold
+  so there is no train/test leakage, but **multi-clip patients are
+  proportionally over-represented in training** vs single-clip
+  patients. For BUV the issue is constrained to the errata-group
+  patient (4 bags from one patient — see `DATASET_SPEC.md` §2),
+  because all other BUV videos are assumed to be one-patient-per-clip
+  per the upstream errata.
+- **Frame near-duplication within the BUV errata-group bags.** Per the
+  BUV upstream errata, "some frames are the same" across the four
+  same-patient videos. These four bags may therefore contain
+  near-duplicate visual content. The patient-grouped fold prevents
+  cross-fold leakage; the small over-representation effect is documented
+  in `DATASET_SPEC.md` §2.
+- **No DICOM pixel calibration.** Both source datasets are extracted
+  frames without per-frame pixel-spacing metadata, so mm-scale spatial
+  metrics (e.g., Hit@2 mm / Hit@4 mm for saliency) are only
+  approximate. Pixel-distance variants are reported instead, or use a
+  literature-derived mm/px assumption with explicit caveat.
+- **Small absolute size.** 366 bags is too small to train large MIL
+  models from scratch; the benchmark is designed primarily as an
+  **external test cohort** for models trained on larger private
+  clinical datasets. Adopters who train on this benchmark are
+  encouraged to report 5-fold cross-validation rather than relying on
+  a single train/test split.
 
 ---
 

@@ -119,32 +119,31 @@ def build_buv_bags(
             "has_bboxes": n_with_bbox > 0,
         })
 
-    # Now emit the merged errata bag (all 4 videos as one bag)
+    # Emit each errata-group video as its own bag, all sharing one
+    # patient_id so the patient-grouped split places them in the same fold.
+    # Per the BUV errata, all four should be labeled malignant. Some frames
+    # are near-duplicates across these four videos (the upstream errata
+    # notes that multiple samples from the same patient were saved); see
+    # DATASET_SPEC.md §2 for the implication on training i.i.d. assumptions.
     if errata_group_videos:
         merged_label = 1  # all four are malignant after relabel
-        bag_id = f"buv_{next_bag_id:04d}"
-        patient_id = "buv_errata_patient_1"
-        next_bag_id += 1
-        n_with_bbox_total = 0
-        n_frames_total = 0
-        frame_offset = 0  # accumulate across the 4 sub-videos so filenames don't collide
+        shared_patient_id = "buv_errata_patient_1"
         for vid, _label, v in errata_group_videos:
-            n_with_bbox_total += _emit_video_frames(
+            bag_id = f"buv_{next_bag_id:04d}"
+            next_bag_id += 1
+            n_with_bbox = _emit_video_frames(
                 vid, v, merged_label, bag_id, buv_extracted_dir, bboxes,
                 out_images, frame_rows, dark_trim=True,
-                frame_idx_offset=frame_offset,
             )
-            frame_offset += len(v["metadata"])
-            n_frames_total += len(v["metadata"])
-        bag_rows.append({
-            "bag_id": bag_id,
-            "dataset": "buv",
-            "source_id": "+".join(vid for vid, _, _ in errata_group_videos),
-            "label": merged_label,
-            "n_frames": n_frames_total,
-            "patient_id": patient_id,
-            "has_bboxes": n_with_bbox_total > 0,
-        })
+            bag_rows.append({
+                "bag_id": bag_id,
+                "dataset": "buv",
+                "source_id": vid,
+                "label": merged_label,
+                "n_frames": len(v["metadata"]),
+                "patient_id": shared_patient_id,
+                "has_bboxes": n_with_bbox > 0,
+            })
 
     return bag_rows, frame_rows
 

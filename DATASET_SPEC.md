@@ -25,30 +25,52 @@ frame_idx.
 Per `BUV_Extracted/errata.txt`:
 
 - **Drop**: `rawframes/benign/x66ef02e7f1b9a0ef` (identical to
-  `rawframes/malignant/x3b88488853e8b7d1`; the benign copy was mislabeled).
+  `rawframes/malignant/x3b88488853e8b7d1`; the benign copy was mislabeled
+  and removed; the malignant copy is retained as a normal BUV bag).
 - **Relabel benign → malignant** for these four videos (same patient,
   multiple acquisitions):
   - `benign/x63c9ba1377f35bf6`
   - `benign/x5a1c46ec6377e946`
   - `malignant/2390fbea047347b` (already malignant; relabel is no-op)
   - `malignant/7a39ab5d4970bf89` (already malignant; relabel is no-op)
-- **Merge** the four-video group above into a single patient bag
-  (`patient_id = "buv_errata_patient_1"`).
+- **Same-patient grouping** for the four-video group above: each is
+  emitted as its own bag, all sharing `patient_id =
+  "buv_errata_patient_1"`. The patient-grouped split (§6 below) then
+  places all four bags into a single fold so no patient leakage occurs
+  across folds.
+- **Frame-near-duplication caveat (errata-group only)**: per the
+  upstream errata, "some frames are the same" across the four
+  errata-group videos because multiple samples were saved for that
+  patient. We do not deduplicate near-duplicate frames at present.
+  Effect: when treating bags as i.i.d. for training or cross-validation,
+  these four bags introduce a small (~1% of the cohort) over-
+  representation of one patient's visual content. Possible mitigations
+  (not implemented): perceptual-hash dedup at frame level, or treat the
+  errata group as a single bag with the original merged-frame pool
+  (the pre-v0.3.0 behavior).
 
 ## 3. Bag unit
 
 | Dataset | Bag unit | Bags per dataset |
 |---|---|---|
-| BUV | One bag = one video (with errata-merge exception) | ~183 after errata |
+| BUV | One bag = one video | ~184 after errata |
 | WHBUS | One bag = one clip | 184 |
 
-Rationale: both source-paper authors report metrics at video / clip
-granularity, never patient-aggregated. WHBUS does not document whether
-multi-clip patients = same breast vs different breasts, so clip-level is
-the only verifiable unit. `patient_id` is recorded as audit metadata
-(`whbus_<patient_id>` parsed from clip names like
-`benign_9161001_10` → patient `9161001`) for downstream sensitivity
-analyses but is not used during bag construction.
+**Important caveat — the bag unit is a clip/video, not a patient.**
+This is the granularity at which the source datasets distribute the
+data and at which the source-paper authors report metrics. WHBUS in
+particular has patients with multiple clips per patient (mean ≈ 1.4
+clips/patient across 131 patients), so a patient with 3 clips
+contributes 3 bags. Within-fold this is not a problem — the
+patient-grouped split (§6) ensures all bags from one patient land in
+the same fold. But for training, multi-clip patients are
+over-represented relative to single-clip patients in proportion to
+their clip count.
+
+`patient_id` is recorded as audit metadata (`whbus_<patient_id>`
+parsed from clip names like `benign_9161001_10` → patient `9161001`;
+synthetic `buv_p<NNN>` for non-errata BUV; `buv_errata_patient_1` for
+the errata-group bags) and drives the fold assignment described in §6.
 
 ## 4. Frame selection algorithm (BUV keyframe algorithm)
 

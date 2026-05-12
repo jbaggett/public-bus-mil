@@ -1,6 +1,6 @@
 [project]
 name = "public-bus-mil"
-version = "0.2.0"
+version = "0.3.0"
 description = "Reproducible exam-level MIL benchmark from public BUS video datasets (MICCAI-BUV + WHBUS) with 5-fold patient-grouped splits"
 readme = "README.md"
 requires-python = ">=3.9"
